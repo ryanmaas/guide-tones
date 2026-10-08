@@ -11,7 +11,7 @@ A piano flashcard tool for learning guide tones and four-note rootless voicings.
 - Guide Tones tab: 36 dominant, major, and minor seventh chords by default; additional chord families are optional.
 - Rootless Voicings tab: 72 cards covering Type A and Type B for those 36 core chords. Use Type A, Type B, or Random above the chord name; fine-tune the selection in the chord pool.
 - Click the large chord name to preview any root and quality available in that lesson. Previews outside the selected pool return to the pool on Next or Start practice.
-- Expand button beside the card status fills the browser window with the flashcard and practice controls. Tap again or press Escape to restore; F toggles the layout. Works in either iPad orientation, with scrolling available for shorter screens or hanging tags.
+- Expand button beside the card status fills the browser window with the flashcard and practice controls. The keyboard keeps the key proportions measured in normal view and grows into available space around the chord and controls. Those proportions stay fixed while rotating the screen. Tap again or press Escape to restore; F toggles the layout. Works in either iPad orientation, with scrolling available for shorter screens or hanging tags.
 - Timed drills, answer reveal controls, and an Anki-inspired review scheduler.
 - Browser-local settings and progress, with JSON export and import.
 
