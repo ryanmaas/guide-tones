@@ -1,0 +1,15 @@
+# Local dependencies and editor/OS files
+node_modules/
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+*.tmp
+*.bak
+
+# Local configuration and personal progress exports
+.env
+.env.*
+!.env.example
+guide-tones-progress-*.json
