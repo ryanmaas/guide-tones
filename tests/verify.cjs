@@ -82,3 +82,85 @@ for(const keyDisplay of ['highlights','dots','outlines','bands','tags-above','la
 console.log('PASS: 7 display settings round-trip with progress, 24 optional dim/half-dim cards, correct notes, and exactly 36 default cards.');
 
 }
+
+{
+assert.equal(G.ROOTLESS_ALL.length,72);
+assert.equal(new Set(G.ROOTLESS_ALL).size,72);
+const examples={
+  '0:maj7:A':[52,55,59,62], '0:maj7:B':[59,62,64,67],
+  '0:min7:A':[51,55,58,62], '0:min7:B':[58,62,63,67],
+  '0:dom7:A':[52,57,58,62], '0:dom7:B':[58,62,64,69]
+};
+for(const [id,expected] of Object.entries(examples))assert.deepEqual(G.voicing(id).notes.map(n=>n.midi),expected,id);
+for(const spelling of ['flats','sharps'])for(const id of G.ROOTLESS_ALL){
+  const c=G.voicing(id,spelling),notes=c.notes;
+  assert.equal(notes.length,4);
+  const third=c.q.id==='min7'?'m3':'3',seventh=c.q.id==='maj7'?'7':'m7',color=c.q.id==='dom7'?'13':'5';
+  assert.deepEqual(notes.map(n=>n.label),c.type==='A'?[third,color,seventh,'9']:[seventh,'9',third,color]);
+  assert.equal(new Set(notes.map(n=>n.pc)).size,4);
+  assert(notes.every(n=>n.pc!==c.pc));
+  assert(notes[0].midi>=48&&notes[0].midi<60);
+  assert(notes[3].midi-notes[0].midi<12);
+  notes.forEach((n,i)=>{
+    assert.equal(pc(n.name),n.pc);
+    assert.equal(n.midi,(n.octave+1)*12+pitches[n.name[0]]+offsets[n.name.slice(1)],`${id}: written octave of ${n.name}`);
+    assert.equal(n.name[0],'CDEFGAB'[('CDEFGAB'.indexOf(c.root[0])+n.degree-1)%7]);
+    assert(n.midi>=G.KEYBOARD_START&&n.midi<G.KEYBOARD_END);
+    if(i)assert(n.midi>notes[i-1].midi);
+  });
+}
+assert.deepEqual(G.voicing('1:dom7:A').notes.map(n=>n.name+n.octave),['F3','B♭3','C♭4','E♭4']);
+assert.deepEqual(G.voicing('6:min7:A').notes.map(n=>n.name+n.octave),['B𝄫3','D♭4','F♭4','A♭4']);
+for(const id of ['0:dom7','0:dim7:A','0:min7:C'])assert.throws(()=>G.voicing(id));
+
+const old=G.defaults();delete old.rootless;delete old.settings.lesson;
+old.pool=['0:dom7','1:min7'];old.cards['0:dom7']=G.schedule(null,'easy',now);old.history=[{id:'0:dom7',at:now,rating:'easy'}];
+const migrated=G.validate(old);
+assert.equal(migrated.settings.lesson,'guide');
+for(const field of ['pool','cards','history'])assert.deepEqual(migrated[field],old[field]);
+assert.deepEqual(migrated.rootless,{pool:G.ROOTLESS_ALL,cards:{},history:[]});
+migrated.settings.lesson='rootless';migrated.rootless.pool=['0:dom7:A','0:dom7:B'];
+migrated.rootless.cards['0:dom7:A']=G.schedule(null,'again',now);
+migrated.rootless.cards['0:dom7:B']=G.schedule(null,'good',now);
+migrated.rootless.history=[{id:'0:dom7:A',at:now,rating:'again'},{id:'0:dom7:B',at:now,rating:'good'}];
+assert.deepEqual(G.validate(JSON.parse(JSON.stringify(migrated))),migrated);
+assert.equal(migrated.cards['0:dom7'].lastRating,'easy');
+assert.equal(migrated.rootless.cards['0:dom7:A'].lastRating,'again');
+assert.equal(migrated.rootless.cards['0:dom7:B'].lastRating,'good');
+assert.equal(G.pick(migrated.rootless.pool,migrated.rootless.cards,'review',[],now+G.MINUTE),'0:dom7:A');
+for(const invalid of [null,{}, {pool:[],cards:{},history:[]}, {pool:['0:dom7'],cards:{},history:[]}, {pool:['0:dom7:A'],cards:{'0:dom7':old.cards['0:dom7']},history:[]}, {pool:['0:dom7:A'],cards:{},history:old.history}])assert.throws(()=>G.validate({...G.defaults(),rootless:invalid}));
+assert.throws(()=>G.validate({...G.defaults(),settings:{...G.defaults().settings,lesson:'invalid'}}));
+console.log('PASS: 72 A/B voicings in both spellings, ascending registers and enharmonic octaves, legacy migration, independent decks, and rootless backup validation.');
+}
+
+{
+assert.equal(G.KEYBOARD_START,36);assert.equal(G.KEYBOARD_END,72);
+const selected=['1:dom7:A','1:dom7:B','7:min7:B'];
+assert.deepEqual(G.withVoicingType(selected,'A'),['1:dom7:A','7:min7:A']);
+assert.deepEqual(G.withVoicingType(selected,'B'),['1:dom7:B','7:min7:B']);
+assert.deepEqual(G.withVoicingType(G.withVoicingType(selected,'A'),'random'),['1:dom7:A','1:dom7:B','7:min7:A','7:min7:B']);
+assert.throws(()=>G.withVoicingType(selected,'invalid'));
+const both=['0:dom7:A','0:dom7:B'],oneType=G.withVoicingType(G.ROOTLESS_ALL,'B');
+for(const random of [()=>0,()=>.9]){
+  assert.equal(G.parse(G.pickRootless(oneType,{},'drill',[],now,random)).type,'B');
+}
+assert.equal(G.pickRootless(both,{},'drill',[],now,()=>0),'0:dom7:A');
+assert.equal(G.pickRootless(both,{},'drill',[],now,()=>.9),'0:dom7:B');
+const due={'0:dom7:A':G.schedule(null,'again',now-G.MINUTE)};
+assert.equal(G.pickRootless(both,due,'review',[],now,()=>.9),'0:dom7:A','Due A precedes a new B even when the random draw favors B');
+const future={'0:dom7:A':G.schedule(null,'easy',now)};
+assert.equal(G.pickRootless(both,future,'review',[],now,()=>0),'0:dom7:B','A scheduled for later cannot be drawn');
+future['0:dom7:B']=G.schedule(null,'good',now);
+assert.equal(G.pickRootless(both,future,'review',[],now,()=>0),null);
+for(const type of ['A','B','random']){
+  const data=G.defaults();data.settings.rootlessType=type;data.rootless.pool=G.withVoicingType(selected,type);
+  data.rootless.cards['1:dom7:A']=G.schedule(null,'easy',now);data.rootless.cards['1:dom7:B']=G.schedule(null,'again',now);
+  assert.deepEqual(G.validate(JSON.parse(JSON.stringify(data))),data);
+}
+const old=G.defaults();delete old.settings.rootlessType;old.rootless.pool=['1:dom7:B'];
+assert.equal(G.validate(old).settings.rootlessType,'B');
+old.rootless.pool=['1:dom7:A','7:min7:B'];assert.equal(G.validate(old).settings.rootlessType,'random');
+assert.deepEqual(G.validate(old).rootless.pool,old.rootless.pool);
+assert.throws(()=>G.validate({...G.defaults(),settings:{...G.defaults().settings,rootlessType:'invalid'}}));
+console.log('PASS: C2–B4 covers every unchanged voicing; type controls preserve selected chords and reviews; Random chooses either eligible type and respects due dates.');
+}
